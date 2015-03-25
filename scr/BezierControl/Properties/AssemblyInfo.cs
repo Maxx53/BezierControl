@@ -6,11 +6,11 @@ using System.Runtime.InteropServices;
 // набора атрибутов. Измените значения этих атрибутов, чтобы изменить сведения,
 // связанные со сборкой.
 [assembly: AssemblyTitle("BezierControl")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Class for drawing cubic bezier curve with mouse, for use in WinForms")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("NVTelecom")]
+[assembly: AssemblyCompany("Maxx53")]
 [assembly: AssemblyProduct("BezierControl")]
-[assembly: AssemblyCopyright("Copyright © NVTelecom 2014")]
+[assembly: AssemblyCopyright("Copyright © Maxx53, 2015")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

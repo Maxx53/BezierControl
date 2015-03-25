@@ -1,10 +1,9 @@
-﻿// <copyright file="BezierClass.cs" company="Maxx53">
-// Copyright (c) 2014 All Rights Reserved
+﻿﻿// <copyright file="BezierClass.cs" company="Maxx53">
+// Copyright (c) 2015 All Rights Reserved
 // </copyright>
 // <author>Maxx53</author>
-// <date>09/03/2014</date>
-// <summary>Drawing bezier curve and mouse control for WinForms</summary>
-
+// <date>23/03/2015</date>
+// <summary>Class for drawing cubic bezier curve with mouse, for use in WinForms.</summary>
 
 using System;
 using System.Collections.Generic;
@@ -26,33 +25,156 @@ namespace BezierControl
     public class BezierLine : List<BezierPoint>
     {
         private int toMove = -1;
-        private double radius;
-        private Point center;
-        private BezierPoint second;
-        private bool firstOrLast = false;
+        private int highLited = -1;
+        private int polyNum = -1;
+
+        private double radius1;
+        private Point center1;
+        private BezierPoint second1;
+        private bool skip1 = false;
+
+        private double radius2;
+        private Point center2;
+        private BezierPoint second2;
+        private bool skip2 = false;
+
+        private Point oldMousePoint;
         private GraphicsPath gp = new GraphicsPath();
         private Control canvas;
-        private Color pathColor = Color.Black;
+
         private bool showControls = true;
         private bool showAnchors = true;
+        public bool Smoothing = true;
+
         private bool isStart = false;
+        private bool polyMoving = false;
+
+        public bool isSnap = false;
+        public int snapRes = 20;
+
+        public Pen pathPen = new Pen(Color.Gray, 2);
+        public Pen ctrlPen = new Pen(Color.Blue, 0);
+
+        private Pen pathPenLight = new Pen(Color.Aqua, 2);
+        private Pen ctrlPenLight = new Pen(Color.CadetBlue, 2);
+
+        private SolidBrush anchorBrush = new SolidBrush(Color.Red);
+        private SolidBrush ctrlBrush = new SolidBrush(Color.Green);
+
+        private SolidBrush anchorLight = new SolidBrush(Color.Pink);
+        private SolidBrush ctrlLight = new SolidBrush(Color.LawnGreen);
+
+        public Color pathPenColor
+        {
+            get
+            {
+                return pathPen.Color;
+            }
+            set
+            {
+                pathPen.Color = value;
+                pathPenLight.Color = Utils.HighlightColor(value);
+             }
+        }
 
 
-        public BezierLine(Control p, Color c)
+        public float pathPenWidth
+        {
+            get
+            {
+                return pathPen.Width;
+            }
+            set
+            {
+                pathPen.Width = value;
+                pathPenLight.Width = pathPen.Width + 1;
+            }
+        }
+
+        public Color ctrlPenColor
+        {
+            get
+            {
+                return ctrlPen.Color;
+            }
+            set
+            {
+                ctrlPen.Color = value;
+                ctrlPenLight.Color = Utils.HighlightColor(value);
+            }
+        }
+
+        public Color anchorBrushColor
+        {
+            get
+            {
+                return anchorBrush.Color;
+            }
+            set
+            {
+                anchorBrush.Color = value;
+                anchorLight.Color = Utils.HighlightColor(value);
+            }
+        }
+
+        public Color ctrlBrushColor
+        {
+            get
+            {
+                return ctrlBrush.Color;
+            }
+            set
+            {
+                ctrlBrush.Color = value;
+                ctrlLight.Color = Utils.HighlightColor(value);
+            }
+        }
+
+        public bool ShowControls
+        {
+            get
+            {
+                return showControls;
+            }
+            set
+            {
+                showControls = value;
+                canvas.Refresh();
+            }
+        }
+
+        public bool ShowAnchors
+        {
+            get
+            {
+                return showAnchors;
+            }
+            set
+            {
+                showAnchors = value;
+                canvas.Refresh();
+            }
+        }
+
+
+        public int anchorSize = 12;
+        public int controlSize = 8;
+
+
+        public BezierLine(Control p)
         {
             canvas = p;
-            pathColor = c;
         }
 
 
         public void AddPoint(int x, int y, PointID id)
         {
-            this.Add(new BezierPoint(new Point(x, y), id));
+            this.Add(new BezierPoint(this, new Point(x, y), id));
         }
 
         public void AddPoint(Point point, PointID id)
         {
-            this.Add(new BezierPoint(point, id));
+            this.Add(new BezierPoint(this, point, id));
         }
 
         public BezierPoint GetToMove()
@@ -60,7 +182,7 @@ namespace BezierControl
             return this[toMove];
         }
 
-        private Point[] toPointArray()
+        public Point[] ToPointArray()
         {
             var resArr = new Point[this.Count];
 
@@ -71,7 +193,7 @@ namespace BezierControl
             return resArr;
 
             //Linq
-            // return this.Select(x => x.Coodr).ToArray();
+             //return this.Select(x => x.Coodr).ToArray();
 
         }
 
@@ -85,60 +207,84 @@ namespace BezierControl
             }
         }
 
-        public void RemoveNode()
+        public void RemoveNode(int idx)
         {
             if (this.Count > 4)
             {
-                if (toMove == 0)
+                if (idx == 0)
                 {
-                    this.RemoveAt(toMove);
-                    this.RemoveAt(toMove);
-                    this.RemoveAt(toMove);
+                    this.RemoveAt(idx);
+                    this.RemoveAt(idx);
+                    this.RemoveAt(idx);
                 }
                 else
-                    if (toMove == this.Count - 1)
+                    if (idx == this.Count - 1)
                     {
-                        this.RemoveAt(toMove - 2);
-                        this.RemoveAt(toMove - 2);
-                        this.RemoveAt(toMove - 2);
+                        this.RemoveAt(idx - 2);
+                        this.RemoveAt(idx - 2);
+                        this.RemoveAt(idx - 2);
                     }
                     else
                     {
-                        this.RemoveAt(toMove);
-                        this.RemoveAt(toMove);
-                        this.RemoveAt(toMove - 1);
+                        this.RemoveAt(idx);
+                        this.RemoveAt(idx);
+                        this.RemoveAt(idx - 1);
                     }
             }
         }
 
+
+        public Rectangle GetRect(Point coord, bool isAnchor)
+        {
+            int Size;
+
+            if (isAnchor)
+                Size = anchorSize;
+            else
+                Size = controlSize;
+
+            int Rad = Size / 2;
+
+            return new Rectangle(coord.X - Rad, coord.Y - Rad, Size, Size);
+        }
+
+        public void UpdateSizes()
+        {
+            for (int i = 0; i < this.Count; i++)
+            {
+                this[i].Rect = GetRect(this[i].Coord, (this[i].Id == PointID.Anchor));
+            }
+        }
+
+
         internal void SetAnchorPos(Point point)
         {
-
+          
             var deltaX = this[toMove].Coord.X - point.X;
             var deltaY = this[toMove].Coord.Y - point.Y;
 
             this[toMove].Coord = point;
-            this[toMove].Rect = new Rectangle(point.X - 6, point.Y - 6, 12, 12);
+            this[toMove].Rect = GetRect(point, true);
 
 
             //Phuckin' copypaste!
             if (toMove == 0)
             {
                 this[toMove + 1].Coord = new Point(this[toMove + 1].Coord.X - deltaX, this[toMove + 1].Coord.Y - deltaY);
-                this[toMove + 1].Rect = new Rectangle(this[toMove + 1].Coord.X - 4, this[toMove + 1].Coord.Y - 4, 8, 8);
+                this[toMove + 1].Rect = GetRect(this[toMove + 1].Coord, false);
             }
             else if (toMove == this.Count - 1)
             {
                 this[toMove - 1].Coord = new Point(this[toMove - 1].Coord.X - deltaX, this[toMove - 1].Coord.Y - deltaY);
-                this[toMove - 1].Rect = new Rectangle(this[toMove - 1].Coord.X - 4, this[toMove - 1].Coord.Y - 4, 8, 8);
+                this[toMove - 1].Rect = GetRect(this[toMove - 1].Coord, false);
             }
             else
             {
                 this[toMove - 1].Coord = new Point(this[toMove - 1].Coord.X - deltaX, this[toMove - 1].Coord.Y - deltaY);
-                this[toMove - 1].Rect = new Rectangle(this[toMove - 1].Coord.X - 4, this[toMove - 1].Coord.Y - 4, 8, 8);
+                this[toMove - 1].Rect = GetRect(this[toMove - 1].Coord, false);
 
                 this[toMove + 1].Coord = new Point(this[toMove + 1].Coord.X - deltaX, this[toMove + 1].Coord.Y - deltaY);
-                this[toMove + 1].Rect = new Rectangle(this[toMove + 1].Coord.X - 4, this[toMove + 1].Coord.Y - 4, 8, 8);
+                this[toMove + 1].Rect = GetRect(this[toMove + 1].Coord, false);
             }
 
         }
@@ -146,20 +292,58 @@ namespace BezierControl
         internal void SetControlsPos(Point point)
         {
             this[toMove].Coord = point;
-            this[toMove].Rect = new Rectangle(point.X - 4, point.Y - 4, 8, 8);
+            this[toMove].Rect = GetRect(point, false);
 
-            if (!firstOrLast)
+            if (!skip1)
             {
-                second.Coord = Utils.setRotation(radius, second.Coord, center, Math.PI + Utils.getAngleRad(point, center));
-                second.Rect = new Rectangle(second.Coord.X - 4, second.Coord.Y - 4, 8, 8);
+                second1.Coord = Utils.setRotation(radius1, second1.Coord, center1, Math.PI + Utils.getAngleRad(point, center1));
+                second1.Rect = GetRect(second1.Coord, false);
             }
         }
 
+
+        internal void SetPolyPos(Point point)
+        {
+            var CtrlNum1 = (polyNum) * 3 + 1;
+            var CtrlNum2 = (polyNum) * 3 + 2;
+
+            var deltaX = oldMousePoint.X - point.X;
+            var deltaY = oldMousePoint.Y - point.Y;
+            
+            this[CtrlNum1].Coord = new Point(this[CtrlNum1].Coord.X - deltaX, this[CtrlNum1].Coord.Y - deltaY);
+            this[CtrlNum1].Rect = GetRect(this[CtrlNum1].Coord, false);
+
+            this[CtrlNum2].Coord = new Point(this[CtrlNum2].Coord.X - deltaX, this[CtrlNum2].Coord.Y - deltaY);
+            this[CtrlNum2].Rect = GetRect(this[CtrlNum2].Coord, false);
+
+            if (!skip1)
+            {
+
+                var firstSync = this[CtrlNum1];
+
+                second1.Coord = Utils.setRotation(radius1, second1.Coord, center1, Math.PI + Utils.getAngleRad(firstSync.Coord, center1));
+                second1.Rect = GetRect(second1.Coord, false);
+            }
+
+            if (!skip2)
+            {
+
+                var secondSync = this[CtrlNum2];
+
+                second2.Coord = Utils.setRotation(radius2, second2.Coord, center2, Math.PI + Utils.getAngleRad(secondSync.Coord, center2));
+                second2.Rect = GetRect(second2.Coord, false);
+
+            }
+            oldMousePoint = point;
+
+        }
+
+
         internal void InsertAtPos(int pos, Point point)
         {
-            this.Insert(pos, new BezierPoint(point, PointID.Control1));
-            this.Insert(pos, new BezierPoint(point, PointID.Anchor));
-            this.Insert(pos, new BezierPoint(point, PointID.Control2));
+            this.Insert(pos, new BezierPoint(this, point, PointID.Control1));
+            this.Insert(pos, new BezierPoint(this, point, PointID.Anchor));
+            this.Insert(pos, new BezierPoint(this, point, PointID.Control2));
 
         }
 
@@ -199,18 +383,28 @@ namespace BezierControl
 
             if (this.Count > 1)
             {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                //e.Graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                if (Smoothing)
+                {
+                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    //e.Graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                }
 
                 gp.Reset();
 
-                gp.AddBeziers(toPointArray());
+                gp.AddBeziers(ToPointArray());
 
 
-                //Draw Path
+                //Draw Real this
 
-                e.Graphics.DrawPath(new Pen(pathColor, 2), gp);
+                e.Graphics.DrawPath(pathPen, gp);
 
+                //Drawing highligt bezier
+                int nu = (polyNum) * 3;
+                if ((polyNum != -1) && (nu + 3 < this.Count))
+                {
+
+                    e.Graphics.DrawBezier(pathPenLight, this[nu].Coord, this[nu + 1].Coord, this[nu + 2].Coord, this[nu + 3].Coord);
+                }
 
                 //Draw Controls Lines
                 if (ShowControls)
@@ -221,7 +415,9 @@ namespace BezierControl
                         if (i != 0)
                         {
                             if (this[i - 1].Id != PointID.Control1)
-                                e.Graphics.DrawLine(Pens.Blue, this[i - 1].Coord, this[i].Coord);
+                            {
+                                e.Graphics.DrawLine(ctrlPen, this[i - 1].Coord, this[i].Coord);
+                            }
                         }
                     }
                 }
@@ -233,70 +429,82 @@ namespace BezierControl
                     {
                         if (this[i].Id == PointID.Anchor)
                         {
-
-                            e.Graphics.FillEllipse(Brushes.Red, this[i].Rect);
+                            if ((highLited != -1) && (i == highLited))
+                            {
+                                e.Graphics.FillEllipse(anchorLight, this[i].Rect);
+                            }
+                            else
+   
+                            e.Graphics.FillEllipse(anchorBrush, this[i].Rect);
 
                         }
                     }
                 }
 
                 //Draw Controls Points
+                //Backward loop
                 if (ShowControls)
                 {
-                    for (int i = 0; i < this.Count; i++)
+                    for (int i = this.Count-1; i > -1; i--)
                     {
-
-
                         if ((this[i].Id == PointID.Control1) || (this[i].Id == PointID.Control2))
                         {
-
-                            e.Graphics.FillEllipse(Brushes.Green, this[i].Rect);
+                            if ((highLited != -1) && (i == highLited))
+                            {
+                                e.Graphics.FillEllipse(ctrlLight, this[i].Rect);
+                            }
+                            else
+                                e.Graphics.FillEllipse(ctrlBrush, this[i].Rect);
                         }
                     }
                 }
+ 
             }
         }
 
-        public void MouseDown(System.Windows.Forms.MouseEventArgs e)
+        public void MouseDown(MouseEventArgs e)
+        {
+            MouseDown(e.Location, e.Button);
+        }
+
+        public void MouseDown(Point location, System.Windows.Forms.MouseButtons mb )
         {
             if (this.Count == 0) return;
+
             isStart = false;
             toMove = -1;
-            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+           // polyNum = -1;
+            polyMoving = false;
+
+            if (mb == MouseButtons.Left)
             {
+
                 for (int i = 0; i < this.Count; i++)
                 {
-                    if (this[i].Rect.Contains(e.Location) && (this[i].Id != PointID.Anchor))
+                    if (this[i].Rect.Contains(location) && (this[i].Id != PointID.Anchor))
                     {
-                        this.firstOrLast = false;
-                        this.toMove = i;
+                        skip1 = false;
+                        toMove = i;
 
                         if ((i != 1) & (i != this.Count - 2))
                         {
 
-                            Point center;
-                            BezierPoint second;
-
                             if (this[i].Id == PointID.Control1)
                             {
-                                center = this[i - 1].Coord;
-                                second = this[i - 2];
+                                center1 = this[i - 1].Coord;
+                                second1 = this[i - 2];
                             }
                             else
                             {
-                                center = this[i + 1].Coord;
-                                second = this[i + 2];
+                                center1 = this[i + 1].Coord;
+                                second1 = this[i + 2];
 
                             }
 
-                            this.center = center;
-                            this.second = second;
-
-
-                            this.radius = Utils.getRadius(second.Coord, center);
+                            radius1 = Utils.getRadius(second1.Coord, center1);
 
                         }
-                        else this.firstOrLast = true;
+                        else skip1 = true;
 
                         return;
                     }
@@ -305,9 +513,9 @@ namespace BezierControl
 
                 for (int i = 0; i < this.Count; i++)
                 {
-                    if (this[i].Rect.Contains(e.Location) && (this[i].Id == PointID.Anchor))
+                    if (this[i].Rect.Contains(location) && (this[i].Id == PointID.Anchor))
                     {
-                        this.toMove = i;
+                        toMove = i;
                         isStart = (i == 0);
                         return;
                     }
@@ -315,110 +523,239 @@ namespace BezierControl
                 }
 
 
-                if (this.gp.IsOutlineVisible(e.Location, new Pen(Color.Black, 10)))
-                {
+                //if found segment
+               if (GetSegmentNumber(location))
+               {
+                   skip1 = false;
+                   skip2 = false;
+                   int polyPos = polyNum * 3;
 
-                    int polys = this.Count / 3;
-                    int inc = 0;
+                   if (polyPos != 0)
+                   {
+                       center1 = this[polyPos].Coord;
+                       second1 = this[polyPos - 1];
+                       radius1 = Utils.getRadius(second1.Coord, center1);
+                   }
+                   else
+                       skip1 = true;
 
-                    for (int k = 0; k < polys; k++)
-                    {
-                        Point[] rrr = new Point[4];
+                   if (polyPos != this.Count - 4)
+                   {
+                       center2 = this[polyPos + 3].Coord;
+                       second2 = this[polyPos + 4];
+                       radius2 = Utils.getRadius(second2.Coord, center2);
+                   }
+                   else
+                       skip2 = true;
+                  
 
-                        for (int i = 0; i < 4; i++)
-                        {
-                            rrr[i] = this[inc + i].Coord;
-                        }
-
-                        inc += 3;
-
-                        //Oh, it's a line!
-                        if ((rrr[0] == rrr[1]) && (rrr[2] == rrr[3]))
-                        {
-                            if (Utils.IsOnLine(new Point(rrr[0].X, rrr[0].Y), new Point(rrr[2].X, rrr[2].Y), e.Location))
-                            {
-                                int newPos = (k + 1) * 3;
-                                this.InsertAtPos(newPos - 1, e.Location);
-                                canvas.Refresh();
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            if (Utils.IsInPolygon(rrr, e.Location))
-                            {
-                                int newPos = (k + 1) * 3;
-                                this.InsertAtPos(newPos - 1, e.Location);
-                                canvas.Refresh();
-                                return;
-                            }
-                        }
-                    }
-                }
-
-
+               }
 
             }
             else
-                if (e.Button == System.Windows.Forms.MouseButtons.Right)
+                if (mb == System.Windows.Forms.MouseButtons.Right)
                 {
-                    this.AddNode(e.Location.X, e.Location.Y);
-                    canvas.Refresh();
-                }
-                else if (e.Button == System.Windows.Forms.MouseButtons.Middle)
-                {
-
-                    for (int i = 0; i < this.Count; i++)
+                    if (polyNum == -1)
                     {
-                        if (this[i].Rect.Contains(e.Location) && (this[i].Id == PointID.Anchor))
+                        var snupping = Utils.GetSnappingPoint(location, snapRes);
+
+                        this.AddNode(snupping.X, snupping.Y);
+                        canvas.Refresh();
+                    }
+                }
+                else if (mb == System.Windows.Forms.MouseButtons.Middle)
+                {
+                    if (polyNum == -1)
+                    {
+
+                        for (int i = 0; i < this.Count; i++)
                         {
-                            this.toMove = i;
+                            if (this[i].Rect.Contains(location) && (this[i].Id == PointID.Anchor))
+                            {
+                                this.toMove = i;
 
-                            this.RemoveNode();
-                            canvas.Refresh();
+                                this.RemoveNode(toMove);
+                                canvas.Refresh();
 
-                            return;
+                                return;
+                            }
+
                         }
+                    }
+                    else
+                    {
+                        int pos = polyNum * 3;
+                        this.RemoveNode(pos);
+                        this.RemoveNode(pos);
+                        polyNum = -1;
+                        canvas.Refresh();
 
+                        return;                       
                     }
 
 
                 }
+        }
+
+
+        private bool GetSegmentNumber(Point location)
+        {
+            if (this.gp.IsOutlineVisible(location, pathPen))
+            {
+                int polys = this.Count / 3;
+                int inc = 0;
+
+                for (int k = 0; k < polys; k++)
+                {
+                    Point[] rrr = new Point[4];
+
+                    for (int i = 0; i < 4; i++)
+                    {
+                        rrr[i] = this[inc + i].Coord;
+                    }
+
+                    inc += 3;
+
+                    var segmentPath = new GraphicsPath();
+
+                    //Oh, it's a line!
+                    if ((rrr[0] == rrr[1]) && (rrr[2] == rrr[3]))
+                    {
+                        segmentPath.AddLine(rrr[0], rrr[2]);
+                    }
+                    else
+                    {
+                        segmentPath.AddBezier(rrr[0], rrr[1], rrr[2], rrr[3]);
+                    }
+
+                    if (segmentPath.IsOutlineVisible(location, pathPen))
+                    {
+                        polyNum = k;
+                        oldMousePoint = location;
+                        break;
+                    }
+
+                    segmentPath.Dispose();
+                }
+            }
+
+            return (polyNum != -1);
+        }
+
+        private void InsertAtPoly(int PolyNum, Point loc)
+        {
+            this.InsertAtPos((PolyNum + 1) * 3 - 1, loc);
+            canvas.Refresh();
+        }
+
+
+        public void MouseUp(MouseEventArgs e)
+        {
+            MouseUp(e.Location, e.Button);
+        }
+
+        public void MouseUp(Point location, System.Windows.Forms.MouseButtons mb)
+        {
+
+            if ((polyNum != -1) && (!polyMoving))
+            {
+                InsertAtPoly(polyNum, location);
+
+                polyNum = -1;
+            }
+
         }
 
         public void MouseMove(MouseEventArgs e)
         {
-            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+            MouseMove(e.Location, e.Button);
+        }
+
+        public void MouseMove(Point location, System.Windows.Forms.MouseButtons mb)
+        {
+
+            if (mb == System.Windows.Forms.MouseButtons.Left)
             {
-                if (toMove != -1)
+                if (polyNum != -1)
                 {
-                    var ourPoint = this.GetToMove();
-
-                    switch (ourPoint.Id)
-                    {
-                        case PointID.Anchor:
-                            SetAnchorPos(e.Location);
-                            break;
-
-
-                        case PointID.Control1:
-
-                            SetControlsPos(e.Location);
-
-                            break;
-                        case PointID.Control2:
-
-                            SetControlsPos(e.Location);
-
-                            break;
-                        default:
-                            break;
-                    }
-                    canvas.Refresh();
+                    SetPolyPos(location);
+                    polyMoving = true;
                 }
+                else
+                    if (toMove != -1)
+                    {
+                        var ourPoint = this.GetToMove();
+
+                        switch (ourPoint.Id)
+                        {
+                            case PointID.Anchor:
+
+                                Point locPoint = location;
+
+                                if (isSnap)
+                                {
+                                    locPoint = Utils.GetSnappingPoint(location, snapRes);
+                                }
+
+                                SetAnchorPos(locPoint);
+                                break;
+
+
+                            case PointID.Control1:
+
+                                SetControlsPos(location);
+
+                                break;
+                            case PointID.Control2:
+
+                                SetControlsPos(location);
+
+                                break;
+                            default:
+                                break;
+                        }
+
+                    }
+
+            }
+            else
+            {
+
+                highLited = -1;
+                polyNum = -1;
+
+                //Finding Control
+                for (int i = 0; i < this.Count; i++)
+                {
+                    if (this[i].Rect.Contains(location) && (this[i].Id != PointID.Anchor))
+                    {
+                        highLited = i;
+                        break;
+                    }
+                }
+                
+
+                //Finding Anchor
+                if (highLited == -1)
+                {
+                    for (int i = 0; i < this.Count; i++)
+                    {
+                        if (this[i].Rect.Contains(location) && (this[i].Id == PointID.Anchor))
+                        {
+                            highLited = i;
+                            break;
+                        }
+                    }
+                }
+
+                //Finding Line
+                if (highLited == -1)
+                GetSegmentNumber(location);
             }
 
+            canvas.Invalidate();
         }
+
 
         internal void ClearLine()
         {
@@ -428,9 +765,14 @@ namespace BezierControl
             canvas.Refresh();
         }
 
-        internal List<Point> ToPixels()
+        public List<Point> ToPixels()
         {
             var temp = new List<Point>();
+
+            GraphicsPath gp = new GraphicsPath();
+
+            gp.AddBeziers(ToPointArray());
+            gp.Flatten(null, 0.1f);
 
             for (int i = 0; i < gp.PointCount - 1; i++)
             {
@@ -440,63 +782,45 @@ namespace BezierControl
                 if (i != gp.PointCount - 1)
                     temp.RemoveAt(temp.Count - 1);
             }
-
             return temp;
         }
 
-
-        private static PointF[] getFlattenPoints(GraphicsPath input)
+        internal List<Point> ToPoints()
         {
-            GraphicsPath tempGp = new GraphicsPath();
+            var temp = new List<Point>();
+           // gp.Flatten(null, 0.1f);
 
-            tempGp.AddBeziers(input.PathPoints);
-            tempGp.Flatten(null, 0.1f);
+            for (int i = 0; i < this.Count; i++)
+            {
+                temp.Add(this[i].Coord);
+            }
 
-            return tempGp.PathPoints;
+            return temp;
         }
 
         public List<Point> ToPolyline()
         {
             var temp = new List<Point>();
+            gp.Flatten(null, 0.1f);
 
-            var points = getFlattenPoints(gp);
-
-            for (int i = 0; i < points.Length; i++)
+            for (int i = 0; i < this.Count; i++)
             {
-                temp.Add(new Point((int)points[i].X, (int)points[i].Y));
+                temp.Add(this[i].Coord);
             }
 
             return temp;
         }
 
-
-        public List<PointF> ToPolylineF()
+        internal List<PointF> ToPolylineF()
         {
             var temp = new List<PointF>();
-            var points = getFlattenPoints(gp);
+            gp.Flatten(null, 0.1f);
 
-            for (int i = 0; i < points.Length; i++)
+            for (int i = 0; i < gp.PathPoints.Length; i++)
             {
-                temp.Add(points[i]);
+                temp.Add(gp.PathPoints[i]);
             }
 
-            return temp;
-        }
-
-        public List<Point> ToPointList()
-        {
-            var temp = new List<Point>();
-          
-            var points = getFlattenPoints(gp);
-
-            for (int i = 0; i < points.Length - 1; i++)
-            {
-                var segment = Utils.GetPointsOnLine((int)points[i].X, (int)points[i].Y, (int)points[i + 1].X, (int)points[i + 1].Y);
-                temp.AddRange(segment);
-
-                if (i != points.Length - 1)
-                    temp.RemoveAt(temp.Count - 1);
-            }
             return temp;
         }
 
@@ -507,42 +831,17 @@ namespace BezierControl
             {
 
                 this.AddPoint(x, y, PointID.Anchor);
-                this.AddNode(x + 60, y);
+                this.AddNode(x, y + 40);
                 canvas.Refresh();
             }
         }
 
-        public bool ShowControls
-        {
-            get
-            {
-                return showControls;
-            }
-            set
-            {
-                showControls = value;
-                canvas.Refresh();
-            }
-        }
-
-        public bool ShowAnchors
-        {
-            get
-            {
-                return showAnchors;
-            }
-            set
-            {
-                showAnchors = value;
-                canvas.Refresh();
-            }
-        }
     }
 
 
     public class BezierPoint
     {
-        public BezierPoint(Point coord, PointID id)
+        public BezierPoint(BezierLine line, Point coord, PointID id)
         {
             this.Coord = coord;
             this.Id = id;
@@ -550,11 +849,11 @@ namespace BezierControl
             switch (id)
             {
                 case PointID.Anchor:
-                    Rect = new Rectangle(coord.X - 6, coord.Y - 6, 12, 12);
+                    Rect = line.GetRect(coord, true);
                     break;
                 case PointID.Control1:
                 case PointID.Control2:
-                    Rect = new Rectangle(coord.X - 4, coord.Y - 4, 8, 8);
+                    Rect = line.GetRect(coord, false);
                     break;
             }
         }
@@ -565,53 +864,15 @@ namespace BezierControl
 
     }
 
-
-    class Utils
+    public class Utils
     {
-        private const double SELECTION_FUZZINESS = 3;
-
-        public static bool IsOnLine(Point a, Point b, Point point)
+        public static Color HighlightColor(Color input)
         {
-            Point leftPoint;
-            Point rightPoint;
-
-            // Normalize start/end to left right to make the offset calc simpler.
-            if (a.X <= b.X)
-            {
-                leftPoint = a;
-                rightPoint = b;
-            }
+            if (input.GetBrightness() < 0.7f)
+                return ControlPaint.Light(input);
             else
-            {
-                leftPoint = b;
-                rightPoint = a;
-            }
-
-            // If point is out of bounds, no need to do further checks.                  
-            if (point.X + SELECTION_FUZZINESS < leftPoint.X || rightPoint.X < point.X - SELECTION_FUZZINESS)
-                return false;
-            else if (point.Y + SELECTION_FUZZINESS < Math.Min(leftPoint.Y, rightPoint.Y) || Math.Max(leftPoint.Y, rightPoint.Y) < point.Y - SELECTION_FUZZINESS)
-                return false;
-
-            double deltaX = rightPoint.X - leftPoint.X;
-            double deltaY = rightPoint.Y - leftPoint.Y;
-
-            // If the line is straight, the earlier boundary check is enough to determine that the point is on the line.
-            // Also prevents division by zero exceptions.
-            if (deltaX == 0 || deltaY == 0)
-                return true;
-
-            double slope = deltaY / deltaX;
-            double offset = leftPoint.Y - leftPoint.X * slope;
-            double calculatedY = point.X * slope + offset;
-
-            // Check calculated Y matches the points Y coord with some easing.
-            bool lineContains = point.Y - SELECTION_FUZZINESS <= calculatedY && calculatedY <= point.Y + SELECTION_FUZZINESS;
-
-            return lineContains;
+                return ControlPaint.Dark(input);
         }
-
-
 
         public static List<Point> GetPointsOnLine(int x0, int y0, int x1, int y1)
         {
@@ -664,63 +925,7 @@ namespace BezierControl
             return temp;
         }
 
-
-
-        public static bool IsInPolygon(Point[] poly, Point p)
-        {
-            Point p1, p2;
-
-
-            bool inside = false;
-
-
-            if (poly.Length < 3)
-            {
-                return inside;
-            }
-
-
-            var oldPoint = new Point(
-                poly[poly.Length - 1].X, poly[poly.Length - 1].Y);
-
-
-            for (int i = 0; i < poly.Length; i++)
-            {
-                var newPoint = new Point(poly[i].X, poly[i].Y);
-
-
-                if (newPoint.X > oldPoint.X)
-                {
-                    p1 = oldPoint;
-
-                    p2 = newPoint;
-                }
-
-                else
-                {
-                    p1 = newPoint;
-
-                    p2 = oldPoint;
-                }
-
-
-                if ((newPoint.X < p.X) == (p.X <= oldPoint.X)
-                    && (p.Y - (long)p1.Y) * (p2.X - p1.X)
-                    < (p2.Y - (long)p1.Y) * (p.X - p1.X))
-                {
-                    inside = !inside;
-                }
-
-
-                oldPoint = newPoint;
-            }
-
-
-            return inside;
-        }
-
-
-
+        
         public static Point setRotation(double radius, Point point, Point centerPoint, double angle)
         {
             return new Point((int)(Math.Cos(angle) * radius + centerPoint.X), (int)(Math.Sin(angle) * radius + centerPoint.Y));
@@ -759,7 +964,37 @@ namespace BezierControl
             return Math.Sqrt(Math.Pow(width, 2) + Math.Pow(height, 2));
         }
 
+        public static Point GetSnappingPoint(Point mouse, int cellSize)
+        {
+            //Get x interval based on cell width
+            var xInterval = GetInterval(mouse.X, cellSize);
 
+            //Get y interal based in cell height
+            var yInterval = GetInterval(mouse.Y, cellSize);
+
+            // return the point on cell grid closest to the mouseposition
+            return new Point()
+            {
+                X = Math.Abs(xInterval.Lower - mouse.X) > Math.Abs(xInterval.Upper - mouse.X) ? xInterval.Upper : xInterval.Lower,
+                Y = Math.Abs(yInterval.Lower - mouse.Y) > Math.Abs(yInterval.Upper - mouse.Y) ? yInterval.Upper : yInterval.Lower,
+            };
+        }
+
+        private static Interval GetInterval(int mousePos, int size)
+        {
+            return new Interval()
+            {
+                Lower = ((mousePos / size)) * size,
+                Upper = ((mousePos / size)) * size + size
+            };
+        }
+
+        class Interval
+        {
+            public int Lower { get; set; }
+            public int Upper { get; set; }
+        }
     }
+   
 
 }

@@ -117,4 +117,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="label4.Text" xml:space="preserve">
+    <value>1) You can drag anchor points (red), control points (green) and line segments.
+2) Right mouse click to spawn new anchor point in mouse porition at bezier line or at the end of the line.
+3) Mouse wheel click to remove anchor point or line segment at mouse position.</value>
+  </data>
 </root>
