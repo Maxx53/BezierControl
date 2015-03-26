@@ -47,8 +47,8 @@ namespace BezierControlDemo
             //bezier.ctrlPenColor = Color.Green;
 
             //If you need to change sizes
-            //bezier.anchorSize = 20;
-            //bezier.controlSize = 10;
+            //bezier.AnchorSize = 20;
+            //bezier.ControlSize = 10;
             //bezier.pathPenWidth = 20;
             //bezier.ctrlPen.Width = 10;
 
@@ -87,5 +87,7 @@ namespace BezierControlDemo
         {
             bezier.MouseUp(e);
         }
+
+
     }
 }
